@@ -658,8 +658,10 @@
 
                     <div class="form-group">
                         <label>Requesting From</label>
-                        <div style="padding: 10px; background: #e8eaed; border-radius: 4px;" id="target-shop-display">
-                            Shop 2</div>
+                        <select id="target-shop-select"
+                            style="padding: 10px; background: #fff; border-radius: 4px; border: 1px solid var(--border);">
+                            <option value="">Loading...</option>
+                        </select>
                     </div>
 
                     <button class="btn btn-primary btn-block" onclick="submitCart()" id="btn-submit-order"
@@ -736,6 +738,7 @@
         var products = [];
         var cart = [];
         var selectedIds = new Set(); // Batch Selection
+        var allShops = new Set(); // Store unique shops
 
         // --- UTILS & TOAST ---
         function showToast(msg) {
@@ -855,11 +858,14 @@
         function populateStaff(staffList) {
             var select = document.getElementById('staff-select');
             select.innerHTML = '<option value="">Select User...</option>';
+            allShops.clear();
+
             staffList.forEach(obj => {
                 var opt = document.createElement('option');
                 opt.value = obj.id;
                 opt.textContent = obj.name + ' (' + obj.shop + ')';
                 select.appendChild(opt);
+                allShops.add(obj.shop);
             });
         }
 
@@ -889,8 +895,29 @@
             document.getElementById('app-view').classList.remove('hidden');
             document.getElementById('user-display').textContent = user.name + ' • ' + user.role + ' • ' + user.shop;
 
-            var otherShop = (user.shop === 'Shop1') ? 'Shop2' : 'Shop1';
-            document.getElementById('target-shop-display').textContent = "Requesting from: " + otherShop;
+            document.getElementById('user-display').textContent = user.name + ' • ' + user.role + ' • ' + user.shop;
+
+            // Populate Target Shop Dropdown
+            var shopSelect = document.getElementById('target-shop-select');
+            shopSelect.innerHTML = '';
+            var shopCount = 0;
+
+            allShops.forEach(shop => {
+                if (shop !== user.shop) {
+                    var opt = document.createElement('option');
+                    opt.value = shop;
+                    opt.textContent = shop;
+                    shopSelect.appendChild(opt);
+                    shopCount++;
+                }
+            });
+
+            if (shopCount === 0) {
+                var opt = document.createElement('option');
+                opt.textContent = "No other shops found";
+                shopSelect.appendChild(opt);
+                shopSelect.disabled = true;
+            }
 
             loadDashboard();
             loadProducts();
@@ -1111,7 +1138,13 @@
 
             setLoading('btn-submit-order', true);
 
-            var otherShop = (currentUser.shop === 'Shop1') ? 'Shop2' : 'Shop1';
+            var otherShop = document.getElementById('target-shop-select').value;
+            if (!otherShop) {
+                showToast("Select a shop to request from");
+                setLoading('btn-submit-order', false);
+                return;
+            }
+
             var requests = cart.map(item => ({
                 fromShop: currentUser.shop,
                 toShop: otherShop,
