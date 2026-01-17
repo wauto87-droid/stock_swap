@@ -1,14 +1,19 @@
 {
-    "name": "FinanceFlow Premium",
-    "short_name": "FinanceFlow",
+    "name": "Stock Swap",
+    "short_name": "StockSwap",
     "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#121212",
     "theme_color": "#121212",
-    "description": "Premium Personal Finance Tracker",
+    "description": "Inventory Management System",
     "icons": [
         {
-            "src": "https://drive.google.com/thumbnail?id=1_X2lFE3_Pob2JWTv1Ljo3vOspyQeTdNU&sz=w512",
+            "src": "https://drive.google.com/thumbnail?id=11Ei7yOCH9TszasGvai4aOBVRswfZTASf&sz=w192",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "https://drive.google.com/thumbnail?id=11Ei7yOCH9TszasGvai4aOBVRswfZTASf&sz=w512",
             "sizes": "512x512",
             "type": "image/png"
         }
