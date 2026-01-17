@@ -710,7 +710,7 @@
     <!-- SCRIPTS -->
     <script>
         // --- CONFIGURATION ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbxrxUrgi_5NA_yQDGWjuVl7K5FiDhZ9-7qHgAvpXW5cEvytxyhfXt1lIpI8HfwvaUAL/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbxziLpIm--U0kAmhnQEaXCf3D25_vVtaaPkyw-5z1hWAjQcD9DdXxG-Pz-8hthl9FhM/exec";
 
         // --- API CLIENT (Fetch Mode for GitHub Pages) ---
         function callApi(action, params) {
@@ -897,27 +897,32 @@
 
             document.getElementById('user-display').textContent = user.name + ' • ' + user.role + ' • ' + user.shop;
 
-            // Populate Target Shop Dropdown
+            // Populate Target Shop Dropdown from Backend
             var shopSelect = document.getElementById('target-shop-select');
-            shopSelect.innerHTML = '';
-            var shopCount = 0;
+            shopSelect.innerHTML = '<option value="">Loading...</option>';
 
-            allShops.forEach(shop => {
-                if (shop !== user.shop) {
+            callApi('getAllShops').then(function (shopList) {
+                shopSelect.innerHTML = '';
+                var shopCount = 0;
+                shopList.forEach(shop => {
+                    if (shop !== user.shop) {
+                        var opt = document.createElement('option');
+                        opt.value = shop;
+                        opt.textContent = shop;
+                        shopSelect.appendChild(opt);
+                        shopCount++;
+                    }
+                });
+
+                if (shopCount === 0) {
                     var opt = document.createElement('option');
-                    opt.value = shop;
-                    opt.textContent = shop;
+                    opt.textContent = "No other shops found";
                     shopSelect.appendChild(opt);
-                    shopCount++;
+                    shopSelect.disabled = true;
                 }
+            }).catch(function (e) {
+                shopSelect.innerHTML = '<option value="">Error loading shops</option>';
             });
-
-            if (shopCount === 0) {
-                var opt = document.createElement('option');
-                opt.textContent = "No other shops found";
-                shopSelect.appendChild(opt);
-                shopSelect.disabled = true;
-            }
 
             loadDashboard();
             loadProducts();
@@ -1031,6 +1036,9 @@
                              <div class="card-meta">
                                 Qty: <b>${req.reqQty}</b> • From ${req.reqBy}
                              </div>
+                             <!-- V11: Qty Edit -->
+                             <input type="number" id="approve-qty-${req.id}" value="${req.reqQty}" style="margin-bottom:8px; width:100%; border:1px solid #ddd;" placeholder="Approve Qty">
+
                              <div class="flex" style="gap: 8px;">
                                 <button class="btn btn-success" style="flex:1; padding:8px;" onclick="processApproval('${req.id}', 'Approve')">Approve</button>
                                 <button class="btn btn-danger" style="padding:8px;" onclick="processApproval('${req.id}', 'Reject')">Reject</button>
@@ -1308,10 +1316,17 @@
                 if (selectedIds.has(String(reqId))) toggleCheck(reqId);
             }
 
+            // Read Qty if exists
+            var qtyInput = document.getElementById('approve-qty-' + reqId);
+            var finalQty = -1;
+            if (qtyInput && qtyInput.value) {
+                finalQty = qtyInput.value;
+            }
+
             var data = {
                 requestId: reqId,
                 action: action,
-                approvedQty: -1, // Auto-Detect in backend
+                approvedQty: finalQty, // Auto-Detect in backend if -1
                 staffName: currentUser.name
             };
 
@@ -1479,6 +1494,5 @@
         }
     </script>
 </body>
-
 
 </html>
