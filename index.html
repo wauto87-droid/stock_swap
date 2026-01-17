@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FinanceFlow</title>
+
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://drive.google.com/thumbnail?id=1_X2lFE3_Pob2JWTv1Ljo3vOspyQeTdNU&sz=w512">
+
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background-color: #121212;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- REPLACE 'YOUR_WEB_APP_URL' BELOW WITH YOUR ACTUAL GOOGLE EXEC URL -->
+    <iframe
+        src="https://script.google.com/macros/s/AKfycbyese_3SRpvOXQO7jPaUemDBOGcLvfRooOD6PQU3vP7rNW96XrMyZCVgJKfh3TC7cy_vA/exec"
+        allow="fullscreen"></iframe>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(() => console.log('Service Worker Registered'));
+        }
+    </script>
+</body>
+
+</html>

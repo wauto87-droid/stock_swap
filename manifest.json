@@ -1,0 +1,16 @@
+{
+    "name": "FinanceFlow Premium",
+    "short_name": "FinanceFlow",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#121212",
+    "theme_color": "#121212",
+    "description": "Premium Personal Finance Tracker",
+    "icons": [
+        {
+            "src": "https://drive.google.com/thumbnail?id=1_X2lFE3_Pob2JWTv1Ljo3vOspyQeTdNU&sz=w512",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
