@@ -1736,36 +1736,65 @@
 
             }).catch(e => {
                 container.innerHTML = '<div style="color:red; text-align:center; padding:20px;">Error: ' + e.message + '</div>';
+            });
+        }
+
+        // --- EXPORT LOGIC ---
+        function downloadBalancesCSV() {
+            if (!window.lastBalancesData || window.lastBalancesData.length === 0) return alert("No data to export");
+
+            var csv = "Product Name,Code,To Give,To Receive\n";
+            window.lastBalancesData.forEach(function (row) {
+                csv += `"${row.name}","${row.code}",${row.toGive},${row.toReceive}\n`;
+            });
+
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement("a");
+            if (link.download !== undefined) {
+                var url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "Stock_Balances_" + new Date().toISOString().slice(0, 10) + ".csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             }
+        }
 
-    // --- EXPORT LOGIC ---
-    function downloadBalancesCSV() {
-                    if (!window.lastBalancesData || window.lastBalancesData.length === 0) return alert("No data to export");
+        // --- INITIALIZATION ---
+        window.onload = function () {
+            populateStaff();
 
-                    var csv = "Product Name,Code,To Give,To Receive\n";
-                    window.lastBalancesData.forEach(function (row) {
-                        csv += `"${row.name}","${row.code}",${row.toGive},${row.toReceive}\n`;
-                    });
+            // Check if user is already logged in
+            var savedUser = localStorage.getItem('stock_swap_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                showDashboard();
+            }
+        };
 
-                    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                    var link = document.createElement("a");
-                    if (link.download !== undefined) {
-                        var url = URL.createObjectURL(blob);
-                        link.setAttribute("href", url);
-                        link.setAttribute("download", "Stock_Balances_" + new Date().toISOString().slice(0, 10) + ".csv");
-                        link.style.visibility = 'hidden';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    }
+        // --- POPULATE STAFF ---
+        function populateStaff() {
+            var select = document.getElementById('staff-select');
+            select.innerHTML = '<option value="">Loading...</option>';
+
+            callApi('getStaffList', {}).then(function (shopNames) {
+                var uniqueShops = [...new Set(shopNames)];
+                var opts = '<option value="" disabled selected>Select Shop</option>';
+                uniqueShops.forEach(s => {
+                    opts += `<option value="${s}">${s}</option>`;
                 });
+                select.innerHTML = opts;
+            }).catch(e => {
+                select.innerHTML = '<option value="">Failed to load</option>';
+                showToast("Error loading shops: " + e.message);
+            });
         }
 
         // --- SERVICE WORKER ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then((reg) => console.log('SW Registered!', reg.scope))
                     .catch((err) => console.log('SW Fail:', err));
             });
         }
