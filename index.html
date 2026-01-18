@@ -560,16 +560,7 @@
 
         <div class="container">
 
-            <!-- HISTORY VIEW -->
-            <div id="history-view" class="hidden">
-                <div class="flex space-between mb-2">
-                    <h3>Transaction History</h3>
-                    <button class="btn" onclick="showDashboard()">Back to Dashboard</button>
-                </div>
-                <div class="card">
-                    <div id="history-list" style="text-align:center; padding:20px; color:#888;">Loading...</div>
-                </div>
-            </div>
+            <!-- HISTORY VIEW MOVED BELOW -->
 
             <!-- BALANCES VIEW -->
             <div id="balances-view" class="hidden">
@@ -710,7 +701,7 @@
     <!-- SCRIPTS -->
     <script>
         // --- CONFIGURATION ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbwGrtIw6ojUva8xRg8N2ZNbX_Kh2z07R2A6L1Q_wNCRUhMCyeFdfg-whQf6LxSoV18l/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbzwTj1CUf5cB8mDOCsJStI_IYO8PBqlfI7KswI4bchtBkmwdtVzGKKskA5hwvdYS-U7/exec";
 
         // --- API CLIENT (Fetch Mode for GitHub Pages) ---
         function callApi(action, params) {
@@ -1417,13 +1408,42 @@
         }
 
         // --- GLOBAL HISTORY ---
+        function clearHistoryFilter() {
+            document.getElementById('hist-start-date').value = '';
+            document.getElementById('hist-end-date').value = '';
+            loadHistory();
+        }
+
         function loadHistory() {
-            document.getElementById('history-list').innerHTML = 'Loading...';
+            document.getElementById('history-list').innerHTML = '<div style="text-align:center; padding:40px;">Loading...</div>';
+
             callApi('getAllTransactions', { staffId: currentUser.id }).then(function (history) {
                 if (history.error) return document.getElementById('history-list').innerHTML = history.error;
 
                 if (history.length === 0) {
-                    document.getElementById('history-list').innerHTML = 'No transactions found.';
+                    document.getElementById('history-list').innerHTML = '<div style="text-align:center; padding:20px;">No transactions found.</div>';
+                    return;
+                }
+
+                // Apply Date Filters
+                var startStr = document.getElementById('hist-start-date').value;
+                var endStr = document.getElementById('hist-end-date').value;
+
+                if (startStr || endStr) {
+                    var startDate = startStr ? new Date(startStr) : new Date('2000-01-01');
+                    var endDate = endStr ? new Date(endStr) : new Date();
+                    // Adjust end date to include the whole day
+                    endDate.setHours(23, 59, 59, 999);
+                    startDate.setHours(0, 0, 0, 0);
+
+                    history = history.filter(h => {
+                        var hDate = new Date(h.date);
+                        return hDate >= startDate && hDate <= endDate;
+                    });
+                }
+
+                if (history.length === 0) {
+                    document.getElementById('history-list').innerHTML = '<div style="text-align:center; padding:20px; color:#999;">No transactions in this period.</div>';
                     return;
                 }
 
@@ -1432,7 +1452,7 @@
                 history.reverse().forEach(h => {
                     var color = h.type.includes('Incoming') ? '#34a853' : '#ea4335';
                     html += `
-                 <div class="card">
+                 <div class="card history-item">
                       <div class="flex space-between">
                           <div style="font-weight:bold; color:${color}; margin-right:8px;">${h.type}</div>
                           <div style="font-size:11px; color:#888;">${h.date}</div>
@@ -1451,6 +1471,165 @@
             }).catch(e => {
                 document.getElementById('history-list').innerHTML = "Error: " + e.message;
             });
+        }
+
+        function printHistory() {
+            var listContainer = document.getElementById('history-list');
+            var items = listContainer.querySelectorAll('.history-item');
+
+            if (items.length === 0) return alert("No history to print.");
+
+            var startDate = document.getElementById('hist-start-date').value || 'Beginning';
+            var endDate = document.getElementById('hist-end-date').value || 'Now';
+
+            var now = new Date();
+            var dateStr = now.toLocaleDateString('en-GB').replace(/\//g, '-');
+            var timeStr = now.toLocaleTimeString('en-US', { hour12: false }).replace(/:/g, '-');
+            var fileName = `Stock Audit Report ${dateStr} ${timeStr}`;
+
+            var printWin = window.open('', '', 'width=900,height=800');
+
+            var head = `
+            <html>
+            <head>
+                <title>${fileName}</title>
+                <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                    body { font-family: 'Inter', sans-serif; color: #1f2937; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.5; }
+                    
+                    /* Header */
+                    .report-header { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #f3f4f6; text-align:center; }
+                    .report-title { font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.5px; margin-bottom: 8px; }
+                    .report-meta { font-size: 12px; color: #6b7280; }
+                    .filter-tag { display: inline-block; background: #f3f4f6; padding: 4px 10px; border-radius: 20px; font-weight: 500; font-size: 11px; margin-top: 4px; }
+
+                    /* Timeline */
+                    .timeline { position: relative; border-left: 2px solid #e5e7eb; margin-left: 16px; padding-left: 30px; }
+                    .t-item { position: relative; margin-bottom: 30px; page-break-inside: avoid; }
+                    
+                    /* Dots */
+                    .t-dot { 
+                        position: absolute; left: -37px; top: 0px; 
+                        width: 12px; height: 12px; border-radius: 50%; 
+                        background: white; border: 2px solid #d1d5db;
+                        background-clip: padding-box;
+                    }
+                    .t-dot.Incoming { border-color: #10b981; background: #d1fae5; }
+                    .t-dot.Outgoing { border-color: #ef4444; background: #fee2e2; }
+
+                    /* Date */
+                    .t-date { font-size: 12px; font-weight: 600; color: #9ca3af; margin-bottom: 4px; display:block; }
+                    
+                    /* Content Card */
+                    .t-card { 
+                        background: white; 
+                        /* border: 1px solid #e5e7eb;
+                        border-radius: 8px; padding: 16px; */
+                        border: 1px solid #e5e7eb;
+                        border-radius: 8px; padding: 16px; 
+                    }
+                    
+                    .t-row { display: flex; justify-content: space-between; align-items: start; }
+                    .t-title { font-weight: 700; font-size: 14px; color: #111827; }
+                    .t-desc { font-size: 13px; color: #4b5563; margin-top: 4px; }
+                    .t-party { font-size: 12px; color: #6b7280; font-style: italic; margin-top: 2px; }
+                    
+                    .badges { display: flex; gap: 6px; margin-top: 8px; }
+                    .badge { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; border: 1px solid #ddd; }
+                    .badge-status { background: #f9fafb; color: #4b5563; }
+
+                    @media print {
+                        body { padding: 0; }
+                        .no-print { display: none; }
+                        .t-card { box-shadow: none; border: 1px solid #ddd; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="report-header">
+                    <div class="report-title">Stock Audit Report</div>
+                    <div class="report-meta">Generated on ${new Date().toLocaleString()}</div>
+                    <div class="filter-tag">Period: ${startDate} to ${endDate}</div>
+                </div>
+                <div class="timeline">
+        `;
+
+            var middle = '';
+
+            items.forEach(function (item) {
+                var typeLine = item.querySelector('.flex div:first-child');
+                var type = typeLine ? typeLine.innerText : 'Transaction';
+                var date = item.querySelector('.flex div:last-child').innerText;
+
+                var metaDiv = item.querySelector('.card-meta');
+                var metaText = metaDiv ? metaDiv.innerText.trim().split('\n') : ['Unknown', 'Unknown'];
+                var productLine = metaText[0] || '';
+                var partyLine = metaText[1] || '';
+
+                var statusBadge = item.querySelector('.status-badge');
+                var status = statusBadge ? statusBadge.innerText : 'Completed';
+
+                var dotClass = type.includes('Incoming') ? 'Incoming' : 'Outgoing';
+
+                middle += `
+                <div class="t-item">
+                    <div class="t-dot ${dotClass}"></div>
+                    <span class="t-date">${date}</span>
+                    <div class="t-card">
+                        <div class="t-row">
+                            <div>
+                                <div class="t-title" style="color:${type.includes('Incoming') ? '#059669' : '#dc2626'}">${type}</div>
+                                <div class="t-desc">${productLine}</div>
+                                <div class="t-party">${partyLine}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div class="badge badge-status">${status}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            });
+
+            var footer = `
+                </div>
+                <div style="margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px; display: flex; justify-content: space-between; font-size: 11px; color: #aaa;">
+                    <div>Authorized Signature</div>
+                    <div>Stock Swap System</div>
+                </div>
+            </body>
+            </html>
+        `;
+
+            printWin.document.write(head + middle + footer);
+            printWin.document.close();
+
+            setTimeout(function () {
+                printWin.focus();
+                printWin.print();
+            }, 500);
+        }
+
+        // --- EXPORT LOGIC ---
+        function downloadBalancesCSV() {
+            if (!window.lastBalancesData || window.lastBalancesData.length === 0) return alert("No data to export");
+
+            var csv = "Product Name,Code,To Give,To Receive\n";
+            window.lastBalancesData.forEach(function (row) {
+                csv += `"${row.name}","${row.code}",${row.toGive},${row.toReceive}\n`;
+            });
+
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement("a");
+            if (link.download !== undefined) {
+                var url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "Stock_Balances_" + new Date().toISOString().slice(0, 10) + ".csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
         }
 
         // --- BALANCES ---
@@ -1473,6 +1652,8 @@
                         </div>`;
                     return;
                 }
+
+                window.lastBalancesData = data; // Cache for Export
 
                 // Calculate Totals
                 var totalGive = 0;
@@ -1508,6 +1689,12 @@
                                 <div class="bal-stat-label" style="color: #94a3b8;">To Receive</div>
                                 <div class="bal-stat-val text-green" style="color: #34d399;">${totalReceive}</div>
                             </div>
+                        </div>
+                        </div>
+                        <div style="text-align:center; margin-top:16px;">
+                            <button class="btn btn-outline" style="border-color:rgba(255,255,255,0.2); color:white; font-size:12px; padding:6px 12px; background:rgba(255,255,255,0.1);" onclick="downloadBalancesCSV()">
+                                📥 Export to Excel
+                            </button>
                         </div>
                     </div>
                 `;
@@ -1549,7 +1736,29 @@
 
             }).catch(e => {
                 container.innerHTML = '<div style="color:red; text-align:center; padding:20px;">Error: ' + e.message + '</div>';
-            });
+            }
+
+    // --- EXPORT LOGIC ---
+    function downloadBalancesCSV() {
+                    if (!window.lastBalancesData || window.lastBalancesData.length === 0) return alert("No data to export");
+
+                    var csv = "Product Name,Code,To Give,To Receive\n";
+                    window.lastBalancesData.forEach(function (row) {
+                        csv += `"${row.name}","${row.code}",${row.toGive},${row.toReceive}\n`;
+                    });
+
+                    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    var link = document.createElement("a");
+                    if (link.download !== undefined) {
+                        var url = URL.createObjectURL(blob);
+                        link.setAttribute("href", url);
+                        link.setAttribute("download", "Stock_Balances_" + new Date().toISOString().slice(0, 10) + ".csv");
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
+                });
         }
 
         // --- SERVICE WORKER ---
