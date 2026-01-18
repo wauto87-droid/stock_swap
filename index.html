@@ -3,13 +3,7 @@
 
 <head>
     <base target="_top">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- PWA Settings -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#121212">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://drive.google.com/thumbnail?id=11Ei7yOCH9TszasGvai4aOBVRswfZTASf&sz=w512">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         /* PREMIUM UI V6 */
@@ -663,6 +657,50 @@
 
         </div>
 
+        <!-- HISTORY VIEW -->
+        <div id="history-view" class="hidden">
+            <div class="flex space-between align-center mb-2">
+                <h3>Transaction History</h3>
+                <button class="btn btn-outline" style="font-size:12px; padding:6px 12px;" onclick="printHistory()">🖨️
+                    Print
+                    Report</button>
+            </div>
+
+            <!-- FILTERS -->
+            <div class="card" style="padding:12px; background:#f8f9fa; border:1px solid #eee; margin-bottom:16px;">
+                <div class="flex gap-2 wrap align-end">
+                    <div style="flex:1; min-width:120px;">
+                        <label
+                            style="font-size:11px; font-weight:bold; color:#555; display:block; margin-bottom:4px;">Start
+                            Date</label>
+                        <input type="date" id="hist-start-date"
+                            style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                    </div>
+                    <div style="flex:1; min-width:120px;">
+                        <label
+                            style="font-size:11px; font-weight:bold; color:#555; display:block; margin-bottom:4px;">End
+                            Date</label>
+                        <input type="date" id="hist-end-date"
+                            style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                    </div>
+                    <div class="flex gap-1" style="align-items: flex-end;">
+                        <button class="btn btn-primary" style="padding:8px 16px;"
+                            onclick="loadHistory()">Filter</button>
+                        <button class="btn btn-outline" style="padding:8px 12px;"
+                            onclick="clearHistoryFilter()">Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="history-list"></div>
+        </div>
+
+        <!-- BALANCE VIEW (Ensuring existence) -->
+        <div id="balances-view" class="hidden">
+            <h3>Current Balances</h3>
+            <div id="balances-list"></div>
+        </div>
+
         <!-- BOTTOM NAVIGATION (V7) -->
         <div class="bottom-nav hidden" id="main-nav">
             <div class="nav-item active" id="nav-home" onclick="showDashboard()">
@@ -728,8 +766,8 @@
         var currentUser = null;
         var products = [];
         var cart = [];
-        var selectedIds = new Set(); // Batch Selection
-        var allShops = new Set(); // Store unique shops
+        // Shop cache
+        var allShops = [];
 
         // --- UTILS & TOAST ---
         function showToast(msg) {
@@ -739,6 +777,8 @@
             document.getElementById('toast-container').appendChild(div);
             setTimeout(function () { div.remove(); }, 3000);
         }
+
+        var selectedIds = new Set(); // Batch Selection
 
         // --- BATCH LOGIC ---
         function toggleCheck(id) {
@@ -849,14 +889,11 @@
         function populateStaff(staffList) {
             var select = document.getElementById('staff-select');
             select.innerHTML = '<option value="">Select User...</option>';
-            allShops.clear();
-
             staffList.forEach(obj => {
                 var opt = document.createElement('option');
                 opt.value = obj.id;
                 opt.textContent = obj.name + ' (' + obj.shop + ')';
                 select.appendChild(opt);
-                allShops.add(obj.shop);
             });
         }
 
@@ -869,20 +906,18 @@
             if (!pass) return alert('Enter password');
 
             setLoading('btn-login', true, "Logging in...");
-            console.log("Attempting login for ID:", staffId);
 
             callApi('login', { id: staffId, password: pass }).then(function (user) {
-                console.log("Login successful:", user);
                 localStorage.setItem('stock_swap_user', JSON.stringify(user));
                 initApp(user);
                 setLoading('btn-login', false);
             }).catch(function (e) {
-                console.error("Login Error:", e);
-                alert("Login Failed: " + e.message + "\n(Please check your password or internet connection)");
+                alert("Login failed: " + e.message);
                 setLoading('btn-login', false);
             });
         }
 
+        // --- APP START ---
         function initApp(user) {
             currentUser = user;
             document.getElementById('login-view').classList.add('hidden');
@@ -894,6 +929,7 @@
             shopSelect.innerHTML = '<option value="">Loading...</option>';
 
             callApi('getAllShops').then(function (shopList) {
+                allShops = shopList;
                 shopSelect.innerHTML = '';
                 var shopCount = 0;
                 shopList.forEach(shop => {
@@ -1015,29 +1051,29 @@
 
                     data.incomingPoints.forEach(req => {
                         incomingHtml += `
-                <div class="card" id="card-${req.id}">
-                    <div class="flex" style="align-items: flex-start;">
-                         <!-- Checkbox -->
-                         <div class="checkmark item-check" data-id="${req.id}" onclick="toggleCheck('${req.id}')">✓</div>
-                         
-                         <div style="flex:1;">
-                             <div class="flex space-between">
-                                 <div class="card-title">${req.name}</div>
-                                 <button class="btn btn-outline" style="padding:2px 8px; font-size:10px;" onclick="showHistory('${req.id}')">Track</button>
-                             </div>
-                             <div class="card-meta">
-                                Qty: <b>${req.reqQty}</b> • From ${req.reqBy}
-                             </div>
-                             <!-- V11: Qty Edit -->
-                             <input type="number" id="approve-qty-${req.id}" value="${req.reqQty}" style="margin-bottom:8px; width:100%; border:1px solid #ddd;" placeholder="Approve Qty">
-
-                             <div class="flex" style="gap: 8px;">
-                                <button class="btn btn-success" style="flex:1; padding:8px;" onclick="processApproval('${req.id}', 'Approve')">Approve</button>
-                                <button class="btn btn-danger" style="padding:8px;" onclick="processApproval('${req.id}', 'Reject')">Reject</button>
-                             </div>
+            <div class="card" id="card-${req.id}">
+                <div class="flex" style="align-items: flex-start;">
+                     <!-- Checkbox -->
+                     <div class="checkmark item-check" data-id="${req.id}" onclick="toggleCheck('${req.id}')">✓</div>
+                     
+                     <div style="flex:1;">
+                         <div class="flex space-between">
+                             <div class="card-title">${req.name}</div>
+                             <button class="btn btn-outline" style="padding:2px 8px; font-size:10px;" onclick="showHistory('${req.id}')">Track</button>
                          </div>
-                    </div>
-                </div>`;
+                         <div class="card-meta">
+                            Qty: <b>${req.reqQty}</b> • From ${req.reqBy}
+                         </div>
+                         <!-- V11: Qty Edit -->
+                         <input type="number" id="approve-qty-${req.id}" value="${req.reqQty}" style="margin-bottom:8px; width:100%; border:1px solid #ddd;" placeholder="Approve Qty">
+                         
+                         <div class="flex" style="gap: 8px;">
+                            <button class="btn btn-success" style="flex:1; padding:8px;" onclick="processApproval('${req.id}', 'Approve')">Approve</button>
+                            <button class="btn btn-danger" style="padding:8px;" onclick="processApproval('${req.id}', 'Reject')">Reject</button>
+                         </div>
+                     </div>
+                </div>
+            </div>`;
                     });
                 }
                 document.getElementById('incoming-list').innerHTML = incomingHtml;
@@ -1049,17 +1085,17 @@
                 } else {
                     data.sentPending.forEach(req => {
                         pendingHtml += `
-                <div class="card" id="card-${req.id}" style="background: #fffdf5; border-left: 4px solid #fbbc04;">
-                    <div class="flex space-between">
-                        <div class="card-title">${req.name}</div>
-                        <span class="status-badge status-Requested">Pending</span>
-                    </div>
-                    <div class="card-meta">
-                         Sent to ${req.toShop}<br>
-                         Qty: ${req.reqQty}
-                    </div>
-                    <button class="btn btn-outline btn-block" onclick="showHistory('${req.id}')">👁️ Track Status</button>
-                </div>`;
+            <div class="card" id="card-${req.id}" style="background: #fffdf5; border-left: 4px solid #fbbc04;">
+                <div class="flex space-between">
+                    <div class="card-title">${req.name}</div>
+                    <span class="status-badge status-Requested">Pending</span>
+                </div>
+                <div class="card-meta">
+                     Sent to ${req.toShop}<br>
+                     Qty: ${req.reqQty}
+                </div>
+                <button class="btn btn-outline btn-block" onclick="showHistory('${req.id}')">👁️ Track Status</button>
+            </div>`;
                     });
                 }
                 document.getElementById('pending-list').innerHTML = pendingHtml;
@@ -1071,19 +1107,19 @@
                 } else {
                     data.activeBorrows.forEach(req => {
                         activeHtml += `
-                <div class="card" id="card-${req.id}">
-                    <div class="flex space-between">
-                        <div class="card-title">${req.name}</div>
-                        <span class="status-badge status-${req.status}">${req.status}</span>
-                    </div>
-                    <div class="card-meta">
-                        Approved: ${req.appQty} items • From: ${req.toShop}
-                    </div>
-                    <div class="flex" style="gap: 8px;">
-                         <input type="number" id="ret-qty-${req.id}" placeholder="Return Qty" style="width: 100px;">
-                         <button class="btn btn-primary" style="flex:1;" id="btn-return-${req.id}" onclick="submitReturn('${req.id}')">Return Items</button>
-                    </div>
-                </div>`;
+            <div class="card" id="card-${req.id}">
+                <div class="flex space-between">
+                    <div class="card-title">${req.name}</div>
+                    <span class="status-badge status-${req.status}">${req.status}</span>
+                </div>
+                <div class="card-meta">
+                    Approved: ${req.appQty} items • From: ${req.toShop}
+                </div>
+                <div class="flex" style="gap: 8px;">
+                     <input type="number" id="ret-qty-${req.id}" placeholder="Return Qty" style="width: 100px;">
+                     <button class="btn btn-primary" style="flex:1;" id="btn-return-${req.id}" onclick="submitReturn('${req.id}')">Return Items</button>
+                </div>
+            </div>`;
                     });
                 }
                 document.getElementById('active-swaps-list').innerHTML = activeHtml;
@@ -1093,57 +1129,22 @@
             }
         }
 
-        // --- SEARCH CART LOGIC REMOVED (Replaced above) ---
-        /* Old addToCart removed */
-
-        function removeItem(index) {
-            cart.splice(index, 1);
-            updateCartUI();
+        function loadProducts() {
+            // Background load
+            callApi('getAllProducts').then(function (list) {
+                products = list;
+            }).catch(console.error);
         }
 
-        function updateCartUI() {
-            var div = document.getElementById('cart-container');
-            var btn = document.getElementById('btn-submit-order');
-
-            if (cart.length === 0) {
-                div.innerHTML = '<div style="color: #999; font-size: 13px; font-style: italic;">List is empty</div>';
-                btn.innerText = "Submit Order (0)";
-                btn.disabled = true;
-                return;
-            }
-
-            var html = '';
-            cart.forEach((item, idx) => {
-                html += `
-            <div class="cart-item">
-                <div>
-                   <div style="font-weight:500;">${item.name}</div>
-                   <div style="font-size:12px; color:#666;">Qty: ${item.qty}</div>
-                </div>
-                <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="removeItem(${idx})">×</button>
-            </div>`;
-            });
-            div.innerHTML = html;
-            btn.innerText = "Submit Order (" + cart.length + ")";
-            btn.disabled = false;
-
-            // Update Nav Badge
-            var badge = document.getElementById('nav-cart-count');
-            if (badge) badge.innerText = "(" + cart.length + ")";
-        }
+        // ...
 
         function submitCart() {
             if (cart.length === 0) return;
-            // Silent Submit - No Confirm
-
-            setLoading('btn-submit-order', true);
 
             var otherShop = document.getElementById('target-shop-select').value;
-            if (!otherShop) {
-                showToast("Select a shop to request from");
-                setLoading('btn-submit-order', false);
-                return;
-            }
+            if (!otherShop) return showToast("Select a shop to request from");
+
+            setLoading('btn-submit-order', true);
 
             var requests = cart.map(item => ({
                 fromShop: currentUser.shop,
@@ -1297,6 +1298,42 @@
             if (badge) badge.innerText = "(" + cart.length + ")";
         }
 
+        function removeItem(index) {
+            cart.splice(index, 1);
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            var div = document.getElementById('cart-container');
+            var btn = document.getElementById('btn-submit-order');
+
+            if (cart.length === 0) {
+                div.innerHTML = '<div style="color: #999; font-size: 13px; font-style: italic;">List is empty</div>';
+                btn.innerText = "Submit Order (0)";
+                btn.disabled = true;
+                return;
+            }
+
+            var html = '';
+            cart.forEach((item, idx) => {
+                html += `
+            <div class="cart-item">
+                <div>
+                   <div style="font-weight:500;">${item.name}</div>
+                   <div style="font-size:12px; color:#666;">Qty: ${item.qty}</div>
+                </div>
+                <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="removeItem(${idx})">×</button>
+            </div>`;
+            });
+            div.innerHTML = html;
+            btn.innerText = "Submit Order (" + cart.length + ")";
+            btn.disabled = false;
+
+            // Update Nav Badge
+            var badge = document.getElementById('nav-cart-count');
+            if (badge) badge.innerText = "(" + cart.length + ")";
+        }
+
         function processApproval(reqId, action) {
             // Silent Action - No Confirm
             // Optimistic UI: Hide card immediately
@@ -1437,6 +1474,8 @@
                     startDate.setHours(0, 0, 0, 0);
 
                     history = history.filter(h => {
+                        // h.date is "YYYY-MM-DD HH:mm:ss" or similar string from Apps Script
+                        // We need to parse it. Assuming standard format or Date.parse works.
                         var hDate = new Date(h.date);
                         return hDate >= startDate && hDate <= endDate;
                     });
@@ -1474,6 +1513,10 @@
         }
 
         function printHistory() {
+            // Collect current data (from the DOM or Global Variable if we had one, but strict DOM cloning is safer/easier here)
+            // Actually, to make it "Premium", we should rebuild the HTML for print specifically rather than dumping the screen view.
+            // We will grab the data from the screen elements for now as we don't store filtered history globally efficiently yet.
+
             var listContainer = document.getElementById('history-list');
             var items = listContainer.querySelectorAll('.history-item');
 
@@ -1523,8 +1566,8 @@
                     /* Content Card */
                     .t-card { 
                         background: white; 
-                        /* border: 1px solid #e5e7eb;
-                        border-radius: 8px; padding: 16px; */
+                        /* border: 1px solid #f3f4f6; box-shadow: 0 1px 3px rgba(0,0,0,0.05); */
+                        /* Print friendly: simpler borders */
                         border: 1px solid #e5e7eb;
                         border-radius: 8px; padding: 16px; 
                     }
@@ -1557,6 +1600,14 @@
             var middle = '';
 
             items.forEach(function (item) {
+                // Extract raw data from the existing DOM elements (fragile but effective if structure is consistent)
+                // Ideally we would reuse the raw JSON data, but 'history' variable is local to loadHistory promise.
+                // HTML Structure: 
+                // .card > .flex > div(Type), div(Date)
+                // .card-meta > Text(Product Qty) + br + Text(With...)
+                // .flex > .status-badge
+
+                // Let's parse securely
                 var typeLine = item.querySelector('.flex div:first-child');
                 var type = typeLine ? typeLine.innerText : 'Transaction';
                 var date = item.querySelector('.flex div:last-child').innerText;
@@ -1593,6 +1644,7 @@
 
             var footer = `
                 </div>
+                <!-- Signature / Footer Area -->
                 <div style="margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px; display: flex; justify-content: space-between; font-size: 11px; color: #aaa;">
                     <div>Authorized Signature</div>
                     <div>Stock Swap System</div>
@@ -1604,38 +1656,16 @@
             printWin.document.write(head + middle + footer);
             printWin.document.close();
 
+            // Wait for images/fonts (not strictly needed for text but good practice)
             setTimeout(function () {
                 printWin.focus();
                 printWin.print();
+                // printWin.close(); // Optional: keep open for manual save
             }, 500);
-        }
-
-        // --- EXPORT LOGIC ---
-        function downloadBalancesCSV() {
-            if (!window.lastBalancesData || window.lastBalancesData.length === 0) return alert("No data to export");
-
-            var csv = "Product Name,Code,To Give,To Receive\n";
-            window.lastBalancesData.forEach(function (row) {
-                csv += `"${row.name}","${row.code}",${row.toGive},${row.toReceive}\n`;
-            });
-
-            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            var link = document.createElement("a");
-            if (link.download !== undefined) {
-                var url = URL.createObjectURL(blob);
-                link.setAttribute("href", url);
-                link.setAttribute("download", "Stock_Balances_" + new Date().toISOString().slice(0, 10) + ".csv");
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
         }
 
         // --- BALANCES ---
         function loadBalances() {
-            var container = document.getElementById('balances-list');
-            container.innerHTML = '<div style="text-align:center; padding:40px; color:#6b7280; animation: pulse 1.5s infinite;">Loading balances...</div>';
 
             callApi('getBalances', { staffId: currentUser.id }).then(function (data) {
                 if (data.error) {
@@ -1701,17 +1731,17 @@
 
                 // Table Header
                 html += `
-                    <div class="card" style="padding:0; overflow:hidden;">
-                        <table style="width:100%; border-collapse: collapse; font-size:14px;">
-                            <thead>
-                                <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb; color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
-                                    <th style="text-align:left; padding:12px 16px; font-weight:600;">Product</th>
-                                    <th style="text-align:right; padding:12px 16px; font-weight:600;">To Give</th>
-                                    <th style="text-align:right; padding:12px 16px; font-weight:600;">To Receive</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                `;
+            <div class="card" style="padding:0; overflow:hidden;">
+            <table style="width:100%; border-collapse: collapse; font-size:14px;">
+                <thead>
+                    <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb; color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
+                        <th style="text-align:left; padding:12px 16px; font-weight:600;">Product</th>
+                        <th style="text-align:right; padding:12px 16px; font-weight:600;">To Give</th>
+                        <th style="text-align:right; padding:12px 16px; font-weight:600;">To Receive</th>
+                    </tr>
+                </thead>
+                <tbody>
+                `;
 
                 // List Items (Table Rows)
                 data.forEach(b => {
@@ -1719,14 +1749,14 @@
                     var recvStyle = b.toReceive > 0 ? "color:#10b981; font-weight:700;" : "color:#e5e7eb;";
 
                     html += `
-                                <tr style="border-bottom:1px solid #f3f4f6;">
-                                    <td style="padding:12px 16px; color:#111827;">
-                                        <div style="font-weight:600;">${b.name}</div>
-                                        <div style="font-size:11px; color:#9ca3af; font-family:monospace; margin-top:2px;">${b.code}</div>
-                                    </td>
-                                    <td style="text-align:right; padding:12px 16px; ${giveStyle}">${b.toGive > 0 ? b.toGive : '-'}</td>
-                                    <td style="text-align:right; padding:12px 16px; ${recvStyle}">${b.toReceive > 0 ? b.toReceive : '-'}</td>
-                                </tr>`;
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:12px 16px; color:#111827;">
+                        <div style="font-weight:600;">${b.name}</div>
+                        <div style="font-size:11px; color:#9ca3af; font-family:monospace; margin-top:2px;">${b.code}</div>
+                    </td>
+                    <td style="text-align:right; padding:12px 16px; ${giveStyle}">${b.toGive > 0 ? b.toGive : '-'}</td>
+                    <td style="text-align:right; padding:12px 16px; ${recvStyle}">${b.toReceive > 0 ? b.toReceive : '-'}</td>
+                </tr>`;
                 });
 
                 html += `</tbody></table></div>`;
@@ -1760,41 +1790,11 @@
                 document.body.removeChild(link);
             }
         }
-
-        // --- INITIALIZATION ---
-        window.onload = function () {
-            populateStaff();
-
-            // Check if user is already logged in
-            var savedUser = localStorage.getItem('stock_swap_user');
-            if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-                showDashboard();
-            }
-        };
-
-        // --- POPULATE STAFF ---
-        function populateStaff() {
-            var select = document.getElementById('staff-select');
-            select.innerHTML = '<option value="">Loading...</option>';
-
-            callApi('getStaffList', {}).then(function (shopNames) {
-                var uniqueShops = [...new Set(shopNames)];
-                var opts = '<option value="" disabled selected>Select Shop</option>';
-                uniqueShops.forEach(s => {
-                    opts += `<option value="${s}">${s}</option>`;
-                });
-                select.innerHTML = opts;
-            }).catch(e => {
-                select.innerHTML = '<option value="">Failed to load</option>';
-                showToast("Error loading shops: " + e.message);
-            });
-        }
-
         // --- SERVICE WORKER ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
+                    .then((reg) => console.log('SW Registered!', reg.scope))
                     .catch((err) => console.log('SW Fail:', err));
             });
         }
