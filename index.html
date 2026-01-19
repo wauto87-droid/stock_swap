@@ -739,7 +739,7 @@
     <!-- SCRIPTS -->
     <script>
         // --- CONFIGURATION ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbzByVOE1YRTarWBcMk2IfCsi8Q8_Y67rrQbO-MVn8M71yNdbtmjbMhdyesRZifjnD4g/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbyv-YO2R5x8jkIKjeGiFhfmPO6pQFRB-0F6m3bHFUZG0tOzsyS5nymbxbRDJnQRVw90/exec";
 
         // --- API CLIENT (Fetch Mode for GitHub Pages) ---
         function callApi(action, params) {
@@ -1105,9 +1105,16 @@
                 if (data.activeBorrows.length === 0) {
                     activeHtml = '<div style="text-align: center; color: #999; padding: 20px;">No active borrows</div>';
                 } else {
+                    // Search Filter
+                    activeHtml += `<div style="margin-bottom:12px;">
+                        <input type="text" id="return-search" placeholder="Search item to return..." 
+                        onkeyup="filterReturnItems(this)" 
+                        style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                    </div>`;
+
                     data.activeBorrows.forEach(req => {
                         activeHtml += `
-            <div class="card" id="card-${req.id}">
+            <div class="card return-item-card" id="card-${req.id}" data-name="${req.name.toLowerCase()}">
                 <div class="flex space-between">
                     <div class="card-title">${req.name}</div>
                     <span class="status-badge status-${req.status}">${req.status}</span>
@@ -1487,18 +1494,23 @@
                 }
 
                 var html = '';
-                // V13: Reverse to show newest first
-                history.reverse().forEach(h => {
+                // V14: Force Timestamp Sort (Robust)
+                history.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+                history.forEach(h => {
                     var color = h.type.includes('Incoming') ? '#34a853' : '#ea4335';
+                    // V14: Add Issued By to Meta
+                    var issuedByStr = h.actionBy ? ` • Issued by ${h.actionBy}` : '';
+
                     html += `
-                 <div class="card history-item">
+                 <div class="card history-item" data-timestamp="${h.timestamp}">
                       <div class="flex space-between">
                           <div style="font-weight:bold; color:${color}; margin-right:8px;">${h.type}</div>
                           <div style="font-size:11px; color:#888;">${h.date}</div>
                       </div>
                       <div class="card-meta" style="margin-top:4px;">
                          ${h.product} (Qty: ${h.qty})<br>
-                         With: ${h.otherParty}
+                         With: ${h.otherParty}${issuedByStr}
                       </div>
                       <div class="flex space-between">
                           <span class="status-badge status-${h.status.replace(' ', '-')}">${h.status}</span>
@@ -1616,6 +1628,13 @@
                 var metaText = metaDiv ? metaDiv.innerText.trim().split('\n') : ['Unknown', 'Unknown'];
                 var productLine = metaText[0] || '';
                 var partyLine = metaText[1] || '';
+                var issuedBy = '';
+
+                if (partyLine.includes(' • Issued by ')) {
+                    var parts = partyLine.split(' • Issued by ');
+                    partyLine = parts[0];
+                    issuedBy = parts[1];
+                }
 
                 var statusBadge = item.querySelector('.status-badge');
                 var status = statusBadge ? statusBadge.innerText : 'Completed';
@@ -1631,7 +1650,8 @@
                             <div>
                                 <div class="t-title" style="color:${type.includes('Incoming') ? '#059669' : '#dc2626'}">${type}</div>
                                 <div class="t-desc">${productLine}</div>
-                                <div class="t-party">${partyLine}</div>
+                                <div class="t-party">With: ${partyLine}</div>
+                                ${issuedBy ? `<div class="t-party" style="color:#4b5563;">Issued by: ${issuedBy}</div>` : ''}
                             </div>
                             <div style="text-align:right;">
                                 <div class="badge badge-status">${status}</div>
@@ -1647,7 +1667,7 @@
                 <!-- Signature / Footer Area -->
                 <div style="margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px; display: flex; justify-content: space-between; font-size: 11px; color: #aaa;">
                     <div>Authorized Signature</div>
-                    <div>Stock Swap System</div>
+                    <div>Stock Swap System v14</div>
                 </div>
             </body>
             </html>
@@ -1805,6 +1825,21 @@
                 navigator.serviceWorker.register('./sw.js')
                     .then((reg) => console.log('SW Registered!', reg.scope))
                     .catch((err) => console.log('SW Fail:', err));
+            });
+        }
+
+        // --- SEARCH FILTER (Active Swaps) ---
+        function filterReturnItems(input) {
+            var filter = input.value.toLowerCase();
+            var cards = document.querySelectorAll('.return-item-card');
+
+            cards.forEach(card => {
+                var name = card.getAttribute('data-name');
+                if (name.includes(filter)) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
             });
         }
     </script>
